@@ -21,20 +21,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Reassemble uploaded native source archive
+      - name: Restore native Android project
         shell: bash
         run: |
           set -euo pipefail
           test -d .build-payload
-          shopt -s nullglob
-          chunks=(.build-payload/part-*.b64)
-          test "${#chunks[@]}" -gt 0
-          cat "${chunks[@]}" | tr -d '\n' | base64 --decode > /tmp/saam-source.zip
-          unzip -tq /tmp/saam-source.zip
+          cat .build-payload/part-*.b64 | tr -d '\n' | base64 --decode > /tmp/saam-source.tar.xz
           mkdir -p /tmp/saam-source
-          unzip -q /tmp/saam-source.zip -d /tmp/saam-source
-          test -d /tmp/saam-source/saam_android_review
-          cp -a /tmp/saam-source/saam_android_review/. .
+          tar -xJf /tmp/saam-source.tar.xz --strip-components=1 -C /tmp/saam-source
+          test -f /tmp/saam-source/app/build.gradle.kts
+          test -f /tmp/saam-source/app/src/main/AndroidManifest.xml
+          cp -a /tmp/saam-source/. .
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
 
@@ -48,12 +45,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.3.1"
-          validate-wrappers: false
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android 16 QPR2 SDK packages
+      - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null
           sdkmanager --install "platforms;android-36.1" "build-tools;36.0.0" "platform-tools"
